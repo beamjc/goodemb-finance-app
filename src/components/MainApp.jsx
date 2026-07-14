@@ -55,7 +55,7 @@ export default function MainApp({ session }) {
   const [loading, setLoading] = useState(true)
 
   const [expForm, setExpForm] = useState({ id: null, category: 'fixed', date: todayISO(), amount: '', note: '' })
-  const [incForm, setIncForm] = useState({ id: null, billDate: todayISO(), company: '', amount: '', status: 'pending' })
+  const [incForm, setIncForm] = useState({ id: null, billDate: todayISO(), billNumber: '', company: '', amount: '', status: 'pending' })
 
   const mk = monthKey(currentMonth)
   const { start, end } = useMemo(() => monthRange(currentMonth), [currentMonth])
@@ -118,7 +118,7 @@ export default function MainApp({ session }) {
 
   // ---- income handlers ----
   function resetIncForm() {
-    setIncForm({ id: null, billDate: todayISO(), company: '', amount: '', status: 'pending' })
+    setIncForm({ id: null, billDate: todayISO(), billNumber: '', company: '', amount: '', status: 'pending' })
   }
   async function saveIncome() {
     const amount = parseFloat(incForm.amount)
@@ -128,18 +128,18 @@ export default function MainApp({ session }) {
     }
     if (incForm.id) {
       await supabase.from('income').update({
-        bill_date: incForm.billDate, company: incForm.company.trim(), amount, status: incForm.status,
+        bill_date: incForm.billDate, bill_number: incForm.billNumber.trim() || null, company: incForm.company.trim(), amount, status: incForm.status,
       }).eq('id', incForm.id)
     } else {
       await supabase.from('income').insert({
-        user_id: userId, bill_date: incForm.billDate, company: incForm.company.trim(), amount, status: incForm.status,
+        user_id: userId, bill_date: incForm.billDate, bill_number: incForm.billNumber.trim() || null, company: incForm.company.trim(), amount, status: incForm.status,
       })
     }
     resetIncForm()
     fetchAll()
   }
   function editIncome(i) {
-    setIncForm({ id: i.id, billDate: i.bill_date, company: i.company, amount: String(i.amount), status: i.status })
+    setIncForm({ id: i.id, billDate: i.bill_date, billNumber: i.bill_number || '', company: i.company, amount: String(i.amount), status: i.status })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   async function deleteIncome(id) {
@@ -187,8 +187,8 @@ export default function MainApp({ session }) {
     downloadCsv(`รายจ่าย_${mk}.csv`, rows)
   }
   function exportIncomeCsv() {
-    const rows = [['วันวางบิล', 'บริษัท', 'ยอดวางบิล', 'สถานะ']]
-    income.forEach(i => rows.push([i.bill_date, i.company, i.amount, i.status === 'transferred' ? 'โอนแล้ว' : 'ยังไม่โอน']))
+    const rows = [['วันวางบิล', 'เลขที่บิล', 'บริษัท', 'ยอดวางบิล', 'สถานะ']]
+    income.forEach(i => rows.push([i.bill_date, i.bill_number || '', i.company, i.amount, i.status === 'transferred' ? 'โอนแล้ว' : 'ยังไม่โอน']))
     downloadCsv(`รายรับ_${mk}.csv`, rows)
   }
 
@@ -275,7 +275,7 @@ export default function MainApp({ session }) {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="text-left text-xs uppercase text-inkSoft border-b-2 border-dashed border-line">
-                            <th className="py-1.5 px-2">วันวางบิล</th><th className="px-2">บริษัท</th><th className="px-2 text-right">ยอด</th><th className="px-2">ค้างมา</th><th></th>
+                            <th className="py-1.5 px-2">วันวางบิล</th><th className="px-2">เลขที่บิล</th><th className="px-2">บริษัท</th><th className="px-2 text-right">ยอด</th><th className="px-2">ค้างมา</th><th></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -285,6 +285,7 @@ export default function MainApp({ session }) {
                             return (
                               <tr key={i.id} className="border-b border-paperDark hover:bg-paperDark">
                                 <td className="py-2.5 px-2">{fmtDateThai(i.bill_date)}</td>
+                                <td className="px-2">{i.bill_number || '-'}</td>
                                 <td className="px-2">{i.company}</td>
                                 <td className="px-2 text-right font-semibold">{fmtMoney(i.amount)}</td>
                                 <td className="px-2">{days > 0 && <span className="text-rust text-xs">{days} วัน</span>}</td>
@@ -436,6 +437,10 @@ export default function MainApp({ session }) {
                       <input type="date" value={incForm.billDate} onChange={e => setIncForm({ ...incForm, billDate: e.target.value })} className="w-full border border-line rounded-md px-2 py-2 text-sm bg-paper" />
                     </div>
                     <div>
+                      <label className="block text-xs text-inkSoft mb-1">เลขที่บิล</label>
+                      <input type="text" placeholder="เช่น INV-0001" value={incForm.billNumber} onChange={e => setIncForm({ ...incForm, billNumber: e.target.value })} className="w-full border border-line rounded-md px-2 py-2 text-sm bg-paper" />
+                    </div>
+                    <div>
                       <label className="block text-xs text-inkSoft mb-1">ชื่อบริษัท</label>
                       <input type="text" placeholder="ชื่อลูกค้า/บริษัท" value={incForm.company} onChange={e => setIncForm({ ...incForm, company: e.target.value })} className="w-full border border-line rounded-md px-2 py-2 text-sm bg-paper" />
                     </div>
@@ -468,7 +473,7 @@ export default function MainApp({ session }) {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="text-left text-xs uppercase text-inkSoft border-b-2 border-dashed border-line">
-                          <th className="py-1.5 px-2">วันวางบิล</th><th className="px-2">บริษัท</th><th className="px-2 text-right">ยอดวางบิล</th><th className="px-2">สถานะ</th><th></th>
+                          <th className="py-1.5 px-2">วันวางบิล</th><th className="px-2">เลขที่บิล</th><th className="px-2">บริษัท</th><th className="px-2 text-right">ยอดวางบิล</th><th className="px-2">สถานะ</th><th></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -478,6 +483,7 @@ export default function MainApp({ session }) {
                           return (
                             <tr key={i.id} className="border-b border-paperDark hover:bg-paperDark">
                               <td className="py-2.5 px-2">{fmtDateThai(i.bill_date)}</td>
+                              <td className="px-2">{i.bill_number || '-'}</td>
                               <td className="px-2">{i.company}</td>
                               <td className="px-2 text-right font-semibold">{fmtMoney(i.amount)}</td>
                               <td className="px-2">

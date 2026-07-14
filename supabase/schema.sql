@@ -21,6 +21,7 @@ create table if not exists income (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   bill_date date not null,
+  bill_number text,
   company text not null,
   amount numeric(12,2) not null check (amount > 0),
   status text not null default 'pending' check (status in ('pending','transferred')),
@@ -69,3 +70,8 @@ create policy "targets_delete_own" on targets for delete using (auth.uid() = use
 alter table expenses drop constraint if exists expenses_category_check;
 alter table expenses add constraint expenses_category_check
   check (category in ('fixed','goods','shipping','credit_dad','credit_beam','labor_child','house','water','electric','other'));
+
+-- ============================================================
+-- เพิ่มคอลัมน์เลขที่บิล — รันบล็อกนี้ถ้าเคยรัน schema.sql ไปแล้วก่อนหน้านี้
+-- ============================================================
+alter table income add column if not exists bill_number text;
