@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.stitch-box {
+  border: 2px dashed #D8C9A3;
+  border-radius: 10px;
+}
+.cat-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+  display: inline-block;
+}
