@@ -57,6 +57,7 @@ export default function MainApp({ session }) {
 
   const [expForm, setExpForm] = useState({ id: null, category: 'fixed', date: todayISO(), amount: '', note: '' })
   const [incForm, setIncForm] = useState({ id: null, billDate: todayISO(), billNumber: '', company: '', amount: '', status: 'pending', transferredDate: '' })
+  const [companyFilter, setCompanyFilter] = useState('')
 
   const mk = monthKey(currentMonth)
   const { start, end } = useMemo(() => monthRange(currentMonth), [currentMonth])
@@ -193,7 +194,7 @@ export default function MainApp({ session }) {
   }
   function exportIncomeCsv() {
     const rows = [['วันวางบิล', 'เลขที่บิล', 'บริษัท', 'ยอดวางบิล', 'สถานะ']]
-    income.forEach(i => rows.push([i.bill_date, i.bill_number || '', i.company, i.amount, i.status === 'transferred' ? 'โอนแล้ว' : 'ยังไม่โอน']))
+    filteredIncome.forEach(i => rows.push([i.bill_date, i.bill_number || '', i.company, i.amount, i.status === 'transferred' ? 'โอนแล้ว' : 'ยังไม่โอน']))
     downloadCsv(`รายรับ_${mk}.csv`, rows)
   }
 
@@ -203,6 +204,11 @@ export default function MainApp({ session }) {
   const totalPending = income.filter(i => i.status === 'pending').reduce((s, i) => s + Number(i.amount || 0), 0)
   const totalPendingAll = pendingAll.reduce((s, i) => s + Number(i.amount || 0), 0)
   const profit = totalReal - totalExpense
+  const filteredIncome = useMemo(() => {
+    const q = companyFilter.trim().toLowerCase()
+    return q ? income.filter(i => i.company.toLowerCase().includes(q)) : income
+  }, [income, companyFilter])
+  const totalFilteredIncome = filteredIncome.reduce((s, i) => s + Number(i.amount || 0), 0)
 
   const byCat = {}
   Object.keys(CATS).forEach(c => byCat[c] = 0)
@@ -480,6 +486,12 @@ export default function MainApp({ session }) {
                     <h3 className="font-serif text-navy m-0">รายการวางบิลเดือนนี้</h3>
                     <button onClick={exportIncomeCsv} className="border border-line text-inkSoft text-xs px-3 py-1.5 rounded-md hover:bg-paperDark">ส่งออก CSV</button>
                   </div>
+                  <div className="mb-3">
+                    <input
+                      type="text" placeholder="ค้นหาชื่อบริษัท..." value={companyFilter} onChange={e => setCompanyFilter(e.target.value)}
+                      className="w-full md:w-64 border border-line rounded-md px-3 py-1.5 text-sm bg-paper"
+                    />
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
@@ -488,7 +500,7 @@ export default function MainApp({ session }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {income.map(i => {
+                        {filteredIncome.map(i => {
                           const bd = new Date(i.bill_date + 'T00:00:00')
                           const days = Math.floor((today - bd) / 86400000)
                           return (
@@ -519,8 +531,12 @@ export default function MainApp({ session }) {
                       </tbody>
                     </table>
                   </div>
-                  {income.length === 0 && <div className="text-center text-inkSoft text-sm py-6">ยังไม่มีรายการวางบิลในเดือนนี้</div>}
-                  <div className="text-right text-sm text-inkSoft mt-3">รวมยอดวางบิลเดือนนี้: <b className="text-ink text-base">{fmtMoney(income.reduce((s, i) => s + Number(i.amount || 0), 0))}</b></div>
+                  {filteredIncome.length === 0 && (
+                    <div className="text-center text-inkSoft text-sm py-6">
+                      {companyFilter.trim() ? 'ไม่พบบริษัทนี้ในเดือนนี้' : 'ยังไม่มีรายการวางบิลในเดือนนี้'}
+                    </div>
+                  )}
+                  <div className="text-right text-sm text-inkSoft mt-3">รวมยอดวางบิล{companyFilter.trim() ? 'ที่ค้นหา' : 'เดือนนี้'}: <b className="text-ink text-base">{fmtMoney(totalFilteredIncome)}</b></div>
                 </div>
               </section>
             )}
