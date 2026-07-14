@@ -25,6 +25,7 @@ create table if not exists income (
   company text not null,
   amount numeric(12,2) not null check (amount > 0),
   status text not null default 'pending' check (status in ('pending','transferred')),
+  transferred_date date,
   created_at timestamptz not null default now()
 );
 
@@ -39,6 +40,7 @@ create table if not exists targets (
 -- ---------- indexes ----------
 create index if not exists idx_expenses_user_date on expenses(user_id, date);
 create index if not exists idx_income_user_date on income(user_id, bill_date);
+create index if not exists idx_income_user_transferred_date on income(user_id, transferred_date);
 
 -- ============================================================
 -- Row Level Security — แต่ละบัญชีเห็นเฉพาะข้อมูลของตัวเอง
@@ -75,3 +77,9 @@ alter table expenses add constraint expenses_category_check
 -- เพิ่มคอลัมน์เลขที่บิล — รันบล็อกนี้ถ้าเคยรัน schema.sql ไปแล้วก่อนหน้านี้
 -- ============================================================
 alter table income add column if not exists bill_number text;
+
+-- ============================================================
+-- เพิ่มคอลัมน์วันที่โอนเงินเข้าจริง — รันบล็อกนี้ถ้าเคยรัน schema.sql ไปแล้วก่อนหน้านี้
+-- ============================================================
+alter table income add column if not exists transferred_date date;
+create index if not exists idx_income_user_transferred_date on income(user_id, transferred_date); -- no-op ถ้ารัน CREATE TABLE ด้านบนไปแล้ว

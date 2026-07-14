@@ -50,27 +50,30 @@ export default function MainApp({ session }) {
   const [expenses, setExpenses] = useState([])
   const [income, setIncome] = useState([])
   const [pendingAll, setPendingAll] = useState([])
+  const [transferredThisMonth, setTransferredThisMonth] = useState([])
   const [target, setTarget] = useState(null)
   const [targetInput, setTargetInput] = useState('')
   const [loading, setLoading] = useState(true)
 
   const [expForm, setExpForm] = useState({ id: null, category: 'fixed', date: todayISO(), amount: '', note: '' })
-  const [incForm, setIncForm] = useState({ id: null, billDate: todayISO(), billNumber: '', company: '', amount: '', status: 'pending' })
+  const [incForm, setIncForm] = useState({ id: null, billDate: todayISO(), billNumber: '', company: '', amount: '', status: 'pending', transferredDate: '' })
 
   const mk = monthKey(currentMonth)
   const { start, end } = useMemo(() => monthRange(currentMonth), [currentMonth])
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
-    const [{ data: exp }, { data: inc }, { data: tgt }, { data: pend }] = await Promise.all([
+    const [{ data: exp }, { data: inc }, { data: tgt }, { data: pend }, { data: trf }] = await Promise.all([
       supabase.from('expenses').select('*').gte('date', start).lt('date', end).order('date', { ascending: false }),
       supabase.from('income').select('*').gte('bill_date', start).lt('bill_date', end).order('bill_date', { ascending: false }),
       supabase.from('targets').select('*').eq('month_key', mk).maybeSingle(),
       supabase.from('income').select('*').eq('status', 'pending').order('bill_date', { ascending: true }),
+      supabase.from('income').select('*').eq('status', 'transferred').gte('transferred_date', start).lt('transferred_date', end).order('transferred_date', { ascending: false }),
     ])
     setExpenses(exp || [])
     setIncome(inc || [])
     setPendingAll(pend || [])
+    setTransferredThisMonth(trf || [])
     setTarget(tgt ? Number(tgt.amount) : null)
     setTargetInput(tgt ? String(tgt.amount) : '')
     setLoading(false)
@@ -118,7 +121,7 @@ export default function MainApp({ session }) {
 
   // ---- income handlers ----
   function resetIncForm() {
-    setIncForm({ id: null, billDate: todayISO(), billNumber: '', company: '', amount: '', status: 'pending' })
+    setIncForm({ id: null, billDate: todayISO(), billNumber: '', company: '', amount: '', status: 'pending', transferredDate: '' })
   }
   async function saveIncome() {
     const amount = parseFloat(incForm.amount)
@@ -126,20 +129,21 @@ export default function MainApp({ session }) {
       alert('กรุณากรอกวันวางบิล ชื่อบริษัท และจำนวนเงินให้ถูกต้อง')
       return
     }
+    const transferredDate = incForm.status === 'transferred' ? (incForm.transferredDate || todayISO()) : null
     if (incForm.id) {
       await supabase.from('income').update({
-        bill_date: incForm.billDate, bill_number: incForm.billNumber.trim() || null, company: incForm.company.trim(), amount, status: incForm.status,
+        bill_date: incForm.billDate, bill_number: incForm.billNumber.trim() || null, company: incForm.company.trim(), amount, status: incForm.status, transferred_date: transferredDate,
       }).eq('id', incForm.id)
     } else {
       await supabase.from('income').insert({
-        user_id: userId, bill_date: incForm.billDate, bill_number: incForm.billNumber.trim() || null, company: incForm.company.trim(), amount, status: incForm.status,
+        user_id: userId, bill_date: incForm.billDate, bill_number: incForm.billNumber.trim() || null, company: incForm.company.trim(), amount, status: incForm.status, transferred_date: transferredDate,
       })
     }
     resetIncForm()
     fetchAll()
   }
   function editIncome(i) {
-    setIncForm({ id: i.id, billDate: i.bill_date, billNumber: i.bill_number || '', company: i.company, amount: String(i.amount), status: i.status })
+    setIncForm({ id: i.id, billDate: i.bill_date, billNumber: i.bill_number || '', company: i.company, amount: String(i.amount), status: i.status, transferredDate: i.transferred_date || '' })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   async function deleteIncome(id) {
@@ -149,7 +153,8 @@ export default function MainApp({ session }) {
   }
   async function toggleIncomeStatus(i) {
     const newStatus = i.status === 'transferred' ? 'pending' : 'transferred'
-    await supabase.from('income').update({ status: newStatus }).eq('id', i.id)
+    const transferredDate = newStatus === 'transferred' ? todayISO() : null
+    await supabase.from('income').update({ status: newStatus, transferred_date: transferredDate }).eq('id', i.id)
     fetchAll()
   }
 
@@ -194,7 +199,7 @@ export default function MainApp({ session }) {
 
   // ---- derived totals ----
   const totalExpense = expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
-  const totalReal = income.filter(i => i.status === 'transferred').reduce((s, i) => s + Number(i.amount || 0), 0)
+  const totalReal = transferredThisMonth.reduce((s, i) => s + Number(i.amount || 0), 0)
   const totalPending = income.filter(i => i.status === 'pending').reduce((s, i) => s + Number(i.amount || 0), 0)
   const totalPendingAll = pendingAll.reduce((s, i) => s + Number(i.amount || 0), 0)
   const profit = totalReal - totalExpense
@@ -252,11 +257,11 @@ export default function MainApp({ session }) {
                     <div className="font-serif font-bold text-xl" style={{ color: '#B6442A' }}>{fmtMoney(totalExpense)}</div>
                   </div>
                   <div className="stitch-box bg-paperCard p-4" style={{ borderColor: '#4F7942' }}>
-                    <div className="text-xs text-inkSoft mb-1">รายได้ที่โอนแล้ว</div>
+                    <div className="text-xs text-inkSoft mb-1">รายได้ที่โอนแล้ว (เงินเข้าจริงเดือนนี้)</div>
                     <div className="font-serif font-bold text-xl" style={{ color: '#4F7942' }}>{fmtMoney(totalReal)}</div>
                   </div>
                   <div className="stitch-box bg-paperCard p-4" style={{ borderColor: '#B8860B' }}>
-                    <div className="text-xs text-inkSoft mb-1">รายได้ที่ยังไม่โอน</div>
+                    <div className="text-xs text-inkSoft mb-1">รายได้ที่ยังไม่โอน (บิลเดือนนี้)</div>
                     <div className="font-serif font-bold text-xl" style={{ color: '#B8860B' }}>{fmtMoney(totalPending)}</div>
                   </div>
                 </div>
@@ -455,6 +460,12 @@ export default function MainApp({ session }) {
                         <option value="transferred">โอนแล้ว</option>
                       </select>
                     </div>
+                    {incForm.status === 'transferred' && (
+                      <div>
+                        <label className="block text-xs text-inkSoft mb-1">วันที่โอนเงินเข้าจริง</label>
+                        <input type="date" value={incForm.transferredDate || todayISO()} onChange={e => setIncForm({ ...incForm, transferredDate: e.target.value })} className="w-full border border-line rounded-md px-2 py-2 text-sm bg-paper" />
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <button onClick={saveIncome} className="bg-navy text-paperCard text-sm font-semibold px-5 py-2 rounded-md hover:bg-navySoft">
@@ -494,6 +505,7 @@ export default function MainApp({ session }) {
                                   {i.status === 'transferred' ? 'โอนแล้ว' : 'ยังไม่โอน'}
                                 </button>
                                 {i.status === 'pending' && days > 0 && <div className="text-rust text-[11px] mt-1">ค้างมา {days} วัน</div>}
+                                {i.status === 'transferred' && i.transferred_date && <div className="text-inkSoft text-[11px] mt-1">โอนวันที่ {fmtDateThai(i.transferred_date)}</div>}
                               </td>
                               <td className="px-2">
                                 <div className="flex gap-1">
