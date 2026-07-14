@@ -9,7 +9,7 @@ create extension if not exists "pgcrypto";
 create table if not exists expenses (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  category text not null check (category in ('fixed','goods','credit','house','water','electric','other')),
+  category text not null check (category in ('fixed','goods','shipping','credit_dad','credit_beam','labor_child','house','water','electric','other')),
   date date not null,
   amount numeric(12,2) not null check (amount > 0),
   note text,
@@ -60,3 +60,12 @@ create policy "targets_select_own" on targets for select using (auth.uid() = use
 create policy "targets_insert_own" on targets for insert with check (auth.uid() = user_id);
 create policy "targets_update_own" on targets for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "targets_delete_own" on targets for delete using (auth.uid() = user_id);
+
+-- ============================================================
+-- อัปเดตหมวดรายจ่าย — รันบล็อกนี้ถ้าเคยรัน schema.sql ไปแล้วก่อนหน้านี้
+-- (ถ้าเป็นฐานข้อมูลใหม่ที่ยังไม่เคยรัน ข้ามส่วนนี้ได้เลย เพราะ create table
+-- ด้านบนใช้ constraint ใหม่อยู่แล้ว)
+-- ============================================================
+alter table expenses drop constraint if exists expenses_category_check;
+alter table expenses add constraint expenses_category_check
+  check (category in ('fixed','goods','shipping','credit_dad','credit_beam','labor_child','house','water','electric','other'));

@@ -3,8 +3,11 @@ import { supabase } from '../supabaseClient'
 
 const CATS = {
   fixed: { label: 'Fixed cost', color: '#B6442A' },
-  goods: { label: 'ของ/ขนส่ง', color: '#C97B45' },
-  credit: { label: 'บัตรเครดิต', color: '#2C3550' },
+  goods: { label: 'ค่าของ (ไหม, วีราเน่)', color: '#C97B45' },
+  shipping: { label: 'ค่าขนส่ง (lalamove)', color: '#D9A441' },
+  credit_dad: { label: 'บัตรเครดิต (ของป๊า)', color: '#2C3550' },
+  credit_beam: { label: 'บัตรเครดิต (ของบีม)', color: '#4A5578' },
+  labor_child: { label: 'ค่าแรงงานเด็ก', color: '#8A5A83' },
   house: { label: 'ค่าบ้าน', color: '#7A5C3E' },
   water: { label: 'ค่าน้ำ', color: '#3E7CA6' },
   electric: { label: 'ค่าไฟ', color: '#B8860B' },
