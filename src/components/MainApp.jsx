@@ -49,6 +49,7 @@ export default function MainApp({ session }) {
   const [currentMonth, setCurrentMonth] = useState(() => { const d = new Date(); d.setDate(1); return d })
   const [expenses, setExpenses] = useState([])
   const [income, setIncome] = useState([])
+  const [pendingAll, setPendingAll] = useState([])
   const [target, setTarget] = useState(null)
   const [targetInput, setTargetInput] = useState('')
   const [loading, setLoading] = useState(true)
@@ -61,13 +62,15 @@ export default function MainApp({ session }) {
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
-    const [{ data: exp }, { data: inc }, { data: tgt }] = await Promise.all([
+    const [{ data: exp }, { data: inc }, { data: tgt }, { data: pend }] = await Promise.all([
       supabase.from('expenses').select('*').gte('date', start).lt('date', end).order('date', { ascending: false }),
       supabase.from('income').select('*').gte('bill_date', start).lt('bill_date', end).order('bill_date', { ascending: false }),
       supabase.from('targets').select('*').eq('month_key', mk).maybeSingle(),
+      supabase.from('income').select('*').eq('status', 'pending').order('bill_date', { ascending: true }),
     ])
     setExpenses(exp || [])
     setIncome(inc || [])
+    setPendingAll(pend || [])
     setTarget(tgt ? Number(tgt.amount) : null)
     setTargetInput(tgt ? String(tgt.amount) : '')
     setLoading(false)
@@ -193,6 +196,7 @@ export default function MainApp({ session }) {
   const totalExpense = expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
   const totalReal = income.filter(i => i.status === 'transferred').reduce((s, i) => s + Number(i.amount || 0), 0)
   const totalPending = income.filter(i => i.status === 'pending').reduce((s, i) => s + Number(i.amount || 0), 0)
+  const totalPendingAll = pendingAll.reduce((s, i) => s + Number(i.amount || 0), 0)
   const profit = totalReal - totalExpense
 
   const byCat = {}
@@ -255,6 +259,47 @@ export default function MainApp({ session }) {
                     <div className="text-xs text-inkSoft mb-1">รายได้ที่ยังไม่โอน</div>
                     <div className="font-serif font-bold text-xl" style={{ color: '#B8860B' }}>{fmtMoney(totalPending)}</div>
                   </div>
+                </div>
+
+                <div className="stitch-box bg-paperCard p-5 mb-4" style={{ borderColor: '#B8860B' }}>
+                  <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
+                    <h3 className="font-serif text-navy m-0">บิลค้างโอนสะสม (ทุกเดือน)</h3>
+                    <div className="text-sm text-inkSoft">
+                      รวม <b className="text-ink">{fmtMoney(totalPendingAll)}</b> ({pendingAll.length} รายการ)
+                    </div>
+                  </div>
+                  {pendingAll.length === 0 ? (
+                    <div className="text-center text-inkSoft text-sm py-4">ไม่มีบิลค้างโอน</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-xs uppercase text-inkSoft border-b-2 border-dashed border-line">
+                            <th className="py-1.5 px-2">วันวางบิล</th><th className="px-2">บริษัท</th><th className="px-2 text-right">ยอด</th><th className="px-2">ค้างมา</th><th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pendingAll.map(i => {
+                            const bd = new Date(i.bill_date + 'T00:00:00')
+                            const days = Math.floor((today - bd) / 86400000)
+                            return (
+                              <tr key={i.id} className="border-b border-paperDark hover:bg-paperDark">
+                                <td className="py-2.5 px-2">{fmtDateThai(i.bill_date)}</td>
+                                <td className="px-2">{i.company}</td>
+                                <td className="px-2 text-right font-semibold">{fmtMoney(i.amount)}</td>
+                                <td className="px-2">{days > 0 && <span className="text-rust text-xs">{days} วัน</span>}</td>
+                                <td className="px-2">
+                                  <button onClick={() => toggleIncomeStatus(i)} className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gold/20 text-gold hover:bg-gold/30">
+                                    ทำเครื่องหมายว่าโอนแล้ว
+                                  </button>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
 
                 <div className="stitch-box bg-paperCard p-5 mb-4">
