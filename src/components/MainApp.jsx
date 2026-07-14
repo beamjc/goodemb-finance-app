@@ -86,6 +86,7 @@ export default function MainApp({ session }) {
     const d = new Date(currentMonth)
     d.setMonth(d.getMonth() + delta)
     setCurrentMonth(d)
+    setCompanyFilter('')
   }
 
   // ---- expense handlers ----
@@ -204,10 +205,14 @@ export default function MainApp({ session }) {
   const totalPending = income.filter(i => i.status === 'pending').reduce((s, i) => s + Number(i.amount || 0), 0)
   const totalPendingAll = pendingAll.reduce((s, i) => s + Number(i.amount || 0), 0)
   const profit = totalReal - totalExpense
-  const filteredIncome = useMemo(() => {
-    const q = companyFilter.trim().toLowerCase()
-    return q ? income.filter(i => i.company.toLowerCase().includes(q)) : income
-  }, [income, companyFilter])
+  const companyOptions = useMemo(
+    () => Array.from(new Set(income.map(i => i.company))).sort((a, b) => a.localeCompare(b, 'th')),
+    [income]
+  )
+  const filteredIncome = useMemo(
+    () => companyFilter ? income.filter(i => i.company === companyFilter) : income,
+    [income, companyFilter]
+  )
   const totalFilteredIncome = filteredIncome.reduce((s, i) => s + Number(i.amount || 0), 0)
 
   const byCat = {}
@@ -487,10 +492,13 @@ export default function MainApp({ session }) {
                     <button onClick={exportIncomeCsv} className="border border-line text-inkSoft text-xs px-3 py-1.5 rounded-md hover:bg-paperDark">ส่งออก CSV</button>
                   </div>
                   <div className="mb-3">
-                    <input
-                      type="text" placeholder="ค้นหาชื่อบริษัท..." value={companyFilter} onChange={e => setCompanyFilter(e.target.value)}
+                    <select
+                      value={companyFilter} onChange={e => setCompanyFilter(e.target.value)}
                       className="w-full md:w-64 border border-line rounded-md px-3 py-1.5 text-sm bg-paper"
-                    />
+                    >
+                      <option value="">ทุกบริษัท</option>
+                      {companyOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -533,10 +541,10 @@ export default function MainApp({ session }) {
                   </div>
                   {filteredIncome.length === 0 && (
                     <div className="text-center text-inkSoft text-sm py-6">
-                      {companyFilter.trim() ? 'ไม่พบบริษัทนี้ในเดือนนี้' : 'ยังไม่มีรายการวางบิลในเดือนนี้'}
+                      {companyFilter ? 'ไม่พบบริษัทนี้ในเดือนนี้' : 'ยังไม่มีรายการวางบิลในเดือนนี้'}
                     </div>
                   )}
-                  <div className="text-right text-sm text-inkSoft mt-3">รวมยอดวางบิล{companyFilter.trim() ? 'ที่ค้นหา' : 'เดือนนี้'}: <b className="text-ink text-base">{fmtMoney(totalFilteredIncome)}</b></div>
+                  <div className="text-right text-sm text-inkSoft mt-3">รวมยอดวางบิล{companyFilter ? 'ที่เลือก' : 'เดือนนี้'}: <b className="text-ink text-base">{fmtMoney(totalFilteredIncome)}</b></div>
                 </div>
               </section>
             )}
